@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log_format/dto"
+	"cf_logpush/dto"
 	"time"
 )
 
