@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func HandleLogs(w http.ResponseWriter, r *http.Request) {
@@ -65,12 +66,10 @@ func HandleLogs(w http.ResponseWriter, r *http.Request) {
 			log.Printf("发送到 td-agent 失败: %v\n", err)
 		}
 		fmt.Println("send success", string(outputJSON))
-
+		fmt.Println("send success time: ", time.Now().Format(time.DateTime))
 		var inputDownLoadLog dto.InputLogForDownLoad
 		if err := json.Unmarshal([]byte(line), &inputDownLoadLog); err != nil {
-			fmt.Println("\n")
-			fmt.Println("err", err.Error())
-			fmt.Println("\n")
+			fmt.Println("HandleLogs json.Unmarshal Err", err.Error())
 			log.Printf("无效的 JSON 数据(离线日志): %s\n", line)
 			continue
 		}

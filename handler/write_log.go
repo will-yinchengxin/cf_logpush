@@ -4,13 +4,14 @@ import (
 	"cf_logpush/dto"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
 	channelSize = 20000
-	fileMode    = 0755
+	fileMode    = 0644
 )
 
 var (
@@ -90,11 +91,16 @@ func WriteToFile(l dto.InputLogForDownLoad) {
 		//region,
 		//region,
 	)
-
+	filePath := fiveMinTime.Format("200601021504")[:8]
+	err = createDirIfNotExist(filePath)
+	if err != nil {
+		fmt.Println("Error creating directory: " + err.Error())
+		return
+	}
 	select {
 	case logChan <- &LogEntry{
 		content:  line + "\n",
-		filename: dto.LogPath + filename,
+		filename: dto.LogPath + filePath + "/" + filename,
 		logTime:  t,
 	}:
 	default:
@@ -122,6 +128,15 @@ func processLogs() {
 	}
 }
 
+func createDirIfNotExist(filePath string) error {
+	if _, err := os.Stat(dto.LogPath + filePath); os.IsNotExist(err) {
+		if err := os.MkdirAll(dto.LogPath+filePath, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func writeLogToFile(entry *LogEntry) {
 	fh, ok := fileHandles.Load(entry.filename)
 	if !ok {
@@ -140,9 +155,8 @@ func writeLogToFile(entry *LogEntry) {
 		file.Close()
 		fileHandles.Delete(entry.filename)
 	}
-	fmt.Println("\n")
 	fmt.Println("write success", entry.content)
-	fmt.Println("\n")
+	fmt.Println("write success time: ", time.Now().Format(time.DateTime))
 }
 
 func createOrOpenFile(filename string) (*os.File, error) {
@@ -158,17 +172,34 @@ func cleanupOldFiles() {
 	fileHandles.Range(func(key, value interface{}) bool {
 		filename := key.(string)
 		file := value.(*os.File)
-		fileTime, err := time.Parse("200601021504", filename[:12])
+
+		split := strings.Split(filename, "/")
+		timeStr := split[len(split)-1][:12]
+
+		loc, _ := time.LoadLocation("Asia/Shanghai")
+		fileTime, err := time.ParseInLocation("200601021504", timeStr, loc)
 		if err != nil {
+			fmt.Printf("cleanupOldFiles Err: Error parsing time for file %s: %v\n", filename, err)
 			return true
 		}
-		if now.Sub(fileTime) > 10*time.Minute {
+
+		nowInLoc := now.In(loc)
+		diff := nowInLoc.Sub(fileTime)
+		fmt.Printf("File: %s, FileTime: %s, Now: %s, Diff: %v\n",
+			split[len(split)-1],
+			fileTime.Format("2006-01-02 15:04:05"),
+			nowInLoc.Format("2006-01-02 15:04:05"),
+			diff,
+		)
+
+		if diff > 10*time.Minute {
 			file.Close()
 			fileHandles.Delete(key)
-			fmt.Println("\n")
-			fmt.Println("close file cause now.Sub(fileTime) > 10*time.Minute", filename)
-			fmt.Println("\n")
+			fmt.Printf("Closed file %s (age: %v)\n", split[len(split)-1], diff)
+		} else {
+			fmt.Printf("File %s does not need cleaning (age: %v)\n", split[len(split)-1], diff)
 		}
+
 		return true
 	})
 }
