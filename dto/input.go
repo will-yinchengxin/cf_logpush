@@ -21,6 +21,8 @@ type InputLogForDownLoad struct {
 	CacheCacheStatus         string            `json:"CacheCacheStatus"`
 	RayID                    string            `json:"RayID"`
 	ResponseHeaders          map[string]string `json:"ResponseHeaders"`
+	EdgeServerIP             string            `json:"EdgeServerIP"`
+	ClientRequestScheme      string            `json:"ClientRequestScheme"`
 }
 
 type InputLog struct {

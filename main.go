@@ -25,6 +25,7 @@ func init() {
 
 func main() {
 	http.HandleFunc("/", handler.HandleLogs)
+	//http.HandleFunc("/client/log_push", handler.HandleClientLogPush)
 	port := "9880"
 	log.Printf("启动日志接收服务器，监听端口 %s...\n", port)
 

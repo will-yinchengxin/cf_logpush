@@ -61,10 +61,20 @@ func WriteToFile(l dto.InputLogForDownLoad) {
 		l.ClientRequestURI,
 		l.ClientRequestProtocol,
 	)
+
+	srvPort := 0
+	if l.ClientRequestScheme == "http" {
+		srvPort = 80
+	} else if l.ClientRequestScheme == "https" {
+		srvPort = 443
+	} else {
+		srvPort = 0
+	}
+
 	line := fmt.Sprintf("LT %s %s %d %s %s %s %s %d %d %d %d %d %d \"%s\" \"%s\" \"%s\" \"%s\" %s %s %s",
 		getStr(l.ClientIP),               // 客户端 IP
-		getStr(l.OriginIP),               // 源 IP
-		l.ClientSrcPort,                  // 端口
+		getStr(l.EdgeServerIP),           // 源 IP
+		srvPort,                          // 源端口
 		getStr(l.ClientRequestHost),      // 主机名
 		getStr(timeStr),                  // 格式化的时间
 		fmt.Sprintf("%d", t.UnixMilli()), // 时间戳（毫秒）
@@ -78,10 +88,10 @@ func WriteToFile(l dto.InputLogForDownLoad) {
 		getStr(l.ClientRequestReferer),   // Referer
 		getStr(l.ClientRequestUserAgent), // User-Agent
 		getStr(l.XForwardedFor),          // X-Forwarded-For
-		"-",                              // 占位符
+		"-",                              // Http Range
 		getStr(l.CacheCacheStatus),       // 缓存状态
-		getStr(l.RayID),                  // RayID
-		"-",                              // 占位符
+		getStr(l.RayID),                  // RayID 请求
+		"1",                              // 距用户最近的边缘用1标示：同客户源日志用0标示（如果由存储回客户源，记为0)
 	)
 
 	fiveMinTime := t.Truncate(5 * time.Minute)

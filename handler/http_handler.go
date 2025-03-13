@@ -78,3 +78,52 @@ func HandleLogs(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func HandleClientLogPush(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "仅支持 POST 方法", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	defer r.Body.Close()
+
+	var reader io.Reader = r.Body
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(r.Body)
+		if err != nil {
+			log.Printf("创建 gzip 解压缩器时出错: %v\n", err)
+			http.Error(w, "无法解压缩请求体", http.StatusBadRequest)
+			return
+		}
+		defer gzipReader.Close()
+		reader = gzipReader
+	}
+
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		log.Printf("读取请求体时出错: %v\n", err)
+		http.Error(w, "读取请求体时出错", http.StatusBadRequest)
+		return
+	}
+	outputLog := dto.OutputLog{}
+	err = json.Unmarshal(body, &outputLog)
+	if err != nil {
+		log.Printf("无效的 JSON 数据: %s\n", err.Error())
+		http.Error(w, "无效的 JSON 数据", http.StatusBadRequest)
+		return
+	}
+	outputJSON, err := json.Marshal(outputLog)
+	if err != nil {
+		log.Printf("序列化输出日志时出错: %v\n", err)
+		http.Error(w, "服务出错", http.StatusInternalServerError)
+		return
+	}
+	if err := SendToTDAgent(string(outputJSON)); err != nil {
+		log.Printf("发送到 td-agent 失败: %v\n", err)
+		http.Error(w, "服务出错", http.StatusInternalServerError)
+		return
+	}
+	w.Write([]byte("success"))
+	w.WriteHeader(http.StatusOK)
+}
