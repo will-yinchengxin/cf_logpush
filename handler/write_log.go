@@ -70,7 +70,7 @@ func WriteToFile(l dto.InputLogForDownLoad) {
 	} else {
 		srvPort = 0
 	}
-
+	reqTD := getSubTime(l.EdgeStartTimestamp, l.EdgeEndTimestamp)
 	line := fmt.Sprintf("LT %s %s %d %s %s %s %s %d %d %d %d %d %d \"%s\" \"%s\" \"%s\" \"%s\" %s %s %s",
 		getStr(l.ClientIP),               // 客户端 IP
 		getStr(l.EdgeServerIP),           // 源 IP
@@ -83,8 +83,10 @@ func WriteToFile(l dto.InputLogForDownLoad) {
 		l.EdgeResponseBodyBytes,          // 响应体大小
 		l.EdgeResponseBytes,              // 总响应大小
 		l.EdgeResponseBodyBytes,          // 响应体大小
-		l.OriginResponseDurationMs,       // 源站响应时间
-		l.OriginResponseDurationMs,       // 源站响应时间（重复）
+
+		l.EdgeTimeToFirstByteMs, // 本机收到请求后，到首包响应时间，单位毫秒
+		reqTD,                   // 请求响应时间，单位毫秒
+
 		getStr(l.ClientRequestReferer),   // Referer
 		getStr(l.ClientRequestUserAgent), // User-Agent
 		getStr(l.XForwardedFor),          // X-Forwarded-For
@@ -116,6 +118,24 @@ func WriteToFile(l dto.InputLogForDownLoad) {
 	default:
 		fmt.Printf("Warning: Log channel is full, dropping log entry for %s\n", filename)
 	}
+}
+
+func getSubTime(s, e string) int64 {
+	layout := "2006-01-02T15:04:05Z"
+	t1, err := time.Parse(layout, s)
+	if err != nil {
+		fmt.Println("解析时间错误:", err)
+		return 0
+	}
+
+	t2, err := time.Parse(layout, e)
+	if err != nil {
+		fmt.Println("解析时间错误:", err)
+		return 0
+	}
+
+	diff := t2.Sub(t1)
+	return diff.Milliseconds()
 }
 
 func getStr(s string) string {

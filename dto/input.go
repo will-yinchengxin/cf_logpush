@@ -10,6 +10,7 @@ type InputLogForDownLoad struct {
 	ClientSrcPort            int               `json:"ClientSrcPort"`
 	ClientRequestHost        string            `json:"ClientRequestHost"`
 	EdgeStartTimestamp       string            `json:"EdgeStartTimestamp"`
+	EdgeEndTimestamp         string            `json:"EdgeEndTimestamp"`
 	ClientRequestURI         string            `json:"ClientRequestURI"`
 	EdgeResponseStatus       int               `json:"EdgeResponseStatus"`
 	EdgeResponseBodyBytes    int               `json:"EdgeResponseBodyBytes"`
@@ -23,6 +24,7 @@ type InputLogForDownLoad struct {
 	ResponseHeaders          map[string]string `json:"ResponseHeaders"`
 	EdgeServerIP             string            `json:"EdgeServerIP"`
 	ClientRequestScheme      string            `json:"ClientRequestScheme"`
+	EdgeTimeToFirstByteMs    int               `json:"EdgeTimeToFirstByteMs"`
 }
 
 type InputLog struct {
