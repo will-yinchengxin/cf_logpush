@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	cfKey = "Bearer JXuzJ0Q65bE_boN_Y5296VliYzQGH04h50jwf-2K"
+	cfKey = "Bearer JXuzJ0Q65bE_boN_Y5296VliYzQGH******"
 	cfUrl = "https://api.cloudflare.com/client/v4/graphql"
 )
 
