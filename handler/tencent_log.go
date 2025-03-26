@@ -173,7 +173,7 @@ func queryDimensionOriginData(param reqForTencentLog, client *cdn.Client, metric
 	}
 
 	resp, err := client.DescribeOriginData(req)
-	//fmt.Println(*resp.Response.RequestId)
+	fmt.Println(*resp.Response.RequestId)
 	if err != nil {
 		if sdkErr, ok := err.(*errors.TencentCloudSDKError); ok {
 			fmt.Printf("queryDimensionOriginData API Error[%s]: %s\n", sdkErr.GetCode(), sdkErr.GetMessage())
@@ -227,7 +227,7 @@ func queryDimensionData(param reqForTencentLog, client *cdn.Client, metric, doma
 		}
 		return
 	}
-
+	fmt.Println("resp", *resp.Response.RequestId)
 	for _, item := range resp.Response.Data {
 		result := CDNDataResult{
 			Domain:   domain,
