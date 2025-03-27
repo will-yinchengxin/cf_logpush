@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	cfKey = "Bearer JXuzJ0Q65bE_boN_Y5296VliYzQGH******"
+	cfKey = "Bearer JXuzJ0Q65bE_boN_Y5296VliYzQGH04h50jwf-2K"
 	cfUrl = "https://api.cloudflare.com/client/v4/graphql"
 )
 
@@ -87,7 +87,7 @@ func HandleCloudFlareOnTimeLog(w http.ResponseWriter, r *http.Request) {
 
 	startTime := time.Unix(startTimeUnix, 0).UTC().Format(time.RFC3339)
 	endTime := time.Unix(endTimeUnix, 0).UTC().Format(time.RFC3339)
-	//fmt.Println("startTime", startTime, "endTime", endTime)
+	fmt.Println("startTime", startTime, "endTime", endTime)
 
 	var (
 		res = make(map[string]interface{})
@@ -100,7 +100,7 @@ func HandleCloudFlareOnTimeLog(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		outputLogs := processCloudFlareData(cloudflareData, startTimeUnix, zone)
+		outputLogs := processCloudFlareData(cloudflareData, startTimeUnix, zone, endTime)
 		res[zone] = outputLogs
 	}
 
@@ -157,7 +157,7 @@ func queryCloudFlare(zoneId, startTime, endTime string) (CloudFlareResponse, err
 	return respData, nil
 }
 
-func processCloudFlareData(cloudflareData CloudFlareResponse, startTimeUnix int64, zoneId string) []OutputLog {
+func processCloudFlareData(cloudflareData CloudFlareResponse, startTimeUnix int64, zoneId, endTime string) []OutputLog {
 	countryMap := make(map[string]*OutputLog)
 	timeMap := make(map[string]time.Time)
 
@@ -171,7 +171,9 @@ func processCloudFlareData(cloudflareData CloudFlareResponse, startTimeUnix int6
 		if country == "" {
 			country = "Unknown"
 		}
-
+		if group.Dimensions.DatetimeMinute == endTime {
+			continue
+		}
 		dateTime, err := time.Parse("2006-01-02T15:04:05Z", group.Dimensions.DatetimeMinute)
 		if err != nil {
 			dateTime = time.Unix(startTimeUnix/1000, 0)
