@@ -124,6 +124,7 @@ func HandleClientLogPush(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "服务出错", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("### client_push ### [time: " + time.Now().Format(time.DateTime) + "] data:" + string(outputJSON))
 	w.Write([]byte("success"))
 	w.WriteHeader(http.StatusOK)
 }

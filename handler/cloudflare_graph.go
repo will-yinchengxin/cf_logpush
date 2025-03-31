@@ -37,7 +37,12 @@ type CloudFlareResponse struct {
 			} `json:"zones"`
 		} `json:"viewer"`
 	} `json:"data"`
-	Errors interface{} `json:"errors"`
+	Errors []struct {
+		Code       string          `json:"code"`
+		Message    string          `json:"message"`
+		Path       []string        `json:"path"`
+		Extensions json.RawMessage `json:"extensions"`
+	} `json:"errors"`
 }
 
 type OutputLog struct {
@@ -121,39 +126,69 @@ func queryCloudFlare(zoneId, startTime, endTime string) (CloudFlareResponse, err
 			fmt.Println("### cloudflare-err ###", "[zoneId: "+zoneId+"] [startTime: "+startTime+"] [endTime: "+endTime+"] [resDataErr: "+err.Error()+"]")
 		}
 	}()
-	req, err := http.NewRequest("POST", cfUrl, strings.NewReader(queryJSON))
-	if err != nil {
-		return CloudFlareResponse{}, fmt.Errorf("创建请求失败: %v", err)
-	}
 
-	req.Header.Set("Authorization", cfKey)
-	req.Header.Set("Content-Type", "application/json")
+	var (
+		respData   CloudFlareResponse
+		maxRetries = 2
+		retryCount = 0
+		retryDelay = 3 * time.Second
+	)
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		req, err := http.NewRequest("POST", cfUrl, strings.NewReader(queryJSON))
+		if err != nil {
+			return CloudFlareResponse{}, fmt.Errorf("创建请求失败: %v", err)
+		}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	req = req.WithContext(ctx)
+		req.Header.Set("Authorization", cfKey)
+		req.Header.Set("Content-Type", "application/json")
 
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return CloudFlareResponse{}, fmt.Errorf("请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return CloudFlareResponse{}, fmt.Errorf("请求返回非200状态码: %d, 响应体: %s", resp.StatusCode, string(bodyBytes))
-	}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		req = req.WithContext(ctx)
 
-	var respData CloudFlareResponse
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return CloudFlareResponse{}, fmt.Errorf("读取响应体失败: %v", err)
+		httpClient := &http.Client{}
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return CloudFlareResponse{}, fmt.Errorf("### cloudflare ### 请求失败: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			return CloudFlareResponse{}, fmt.Errorf("### cloudflare ### 请求返回非200状态码: %d, 响应体: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return CloudFlareResponse{}, fmt.Errorf("### cloudflare ### 读取响应体失败: %v", err)
+		}
+		err = json.Unmarshal(bodyBytes, &respData)
+		if err != nil {
+			return CloudFlareResponse{}, fmt.Errorf("### cloudflare ### 解析响应失败: %v", err)
+		}
+		if len(respData.Errors) > 0 {
+			firstErr := respData.Errors[0]
+			fmt.Println("### cloudflare ### API错误", "[zoneId: "+zoneId+"] [startTime: "+startTime+"] [endTime: "+endTime+"]", fmt.Sprintf("[msg: %s] [code: %s] [path: %s]", firstErr.Message, firstErr.Code, firstErr.Path))
+			if attempt < maxRetries {
+				retryCount++
+				time.Sleep(retryDelay)
+				continue
+			}
+		}
+		if len(respData.Data.Viewer.Zones[0].HttpRequestsAdaptiveGroups) == 0 {
+			fmt.Println("### cloudflare ### 无响应数据", "[zoneId: "+zoneId+"] [startTime: "+startTime+"] [endTime: "+endTime+"]")
+			if attempt < maxRetries {
+				retryCount++
+				time.Sleep(retryDelay)
+				continue
+			}
+		}
+		break
 	}
-	err = json.Unmarshal(bodyBytes, &respData)
-	if err != nil {
-		return CloudFlareResponse{}, fmt.Errorf("解析响应失败: %v", err)
+	if retryCount == 2 {
+		fmt.Println("### cloudflare ###", "[zoneId: "+zoneId+"] [startTime: "+startTime+"] [endTime: "+endTime+"]"+" [status: API错误/无响应数据]")
+	} else {
+		fmt.Println("### cloudflare ###", "[zoneId: "+zoneId+"] [startTime: "+startTime+"] [endTime: "+endTime+"]"+" [status: success]")
 	}
-	fmt.Println("### cloudflare ###", "[zoneId: "+zoneId+"] [startTime: "+startTime+"] [endTime: "+endTime+"]"+" [status: success]")
 	return respData, nil
 }
 
