@@ -44,7 +44,8 @@ func initLogWriter() {
 }
 
 func WriteToFile(l dto.InputLogForDownLoad) {
-	t, err := time.Parse(time.RFC3339, l.EdgeStartTimestamp)
+	//t, err := time.Parse(time.RFC3339, l.EdgeStartTimestamp)
+	t, err := time.Parse(time.RFC3339, l.EdgeEndTimestamp)
 	if err != nil {
 		fmt.Println("Error parsing time")
 		return

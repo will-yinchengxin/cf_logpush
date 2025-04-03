@@ -106,25 +106,26 @@ func HandleClientLogPush(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "读取请求体时出错", http.StatusBadRequest)
 		return
 	}
-	outputLog := dto.OutputLog{}
+	outputLog := dto.ClientOutPut{}
 	err = json.Unmarshal(body, &outputLog)
 	if err != nil {
 		log.Printf("无效的 JSON 数据: %s\n", err.Error())
 		http.Error(w, "无效的 JSON 数据", http.StatusBadRequest)
 		return
 	}
-	outputJSON, err := json.Marshal(outputLog)
+	outputJSON, err := json.Marshal(outputLog.OutputLog)
 	if err != nil {
 		log.Printf("序列化输出日志时出错: %v\n", err)
 		http.Error(w, "服务出错", http.StatusInternalServerError)
 		return
 	}
 	if err := SendToTDAgent(string(outputJSON)); err != nil {
-		log.Printf("发送到 td-agent 失败: %v\n", err)
+		log.Printf("### client_push_err ### [time: " + time.Now().Format(time.DateTime) + "] [Err: " + err.Error() + "]")
 		http.Error(w, "服务出错", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("### client_push ### [time: " + time.Now().Format(time.DateTime) + "] data:" + string(outputJSON))
+	marshal, _ := json.Marshal(outputLog)
+	fmt.Println("### client_push ### [time: " + time.Now().Format(time.DateTime) + "] data:" + string(marshal))
 	w.Write([]byte("success"))
 	w.WriteHeader(http.StatusOK)
 }

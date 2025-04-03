@@ -21,7 +21,8 @@ func TransformLog(input dto.InputLog) dto.OutputLog {
 		BSFailNum: 0,
 	}
 
-	t, err := time.Parse(time.RFC3339, input.EdgeStartTimestamp)
+	//t, err := time.Parse(time.RFC3339, input.EdgeStartTimestamp)
+	t, err := time.Parse(time.RFC3339, input.EdgeEndTimestamp)
 	if err == nil {
 		output.StartTime = t.UnixMilli()
 	}

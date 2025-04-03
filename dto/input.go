@@ -29,6 +29,7 @@ type InputLogForDownLoad struct {
 
 type InputLog struct {
 	EdgeStartTimestamp   string            `json:"EdgeStartTimestamp"`
+	EdgeEndTimestamp     string            `json:"EdgeEndTimestamp"`
 	ClientCountry        string            `json:"ClientCountry"`
 	ClientRegionCode     string            `json:"ClientRegionCode"`
 	ClientRequestHost    string            `json:"ClientRequestHost"`
@@ -38,6 +39,11 @@ type InputLog struct {
 	EdgeResponseStatus   int               `json:"EdgeResponseStatus"`
 	OriginResponseStatus int               `json:"OriginResponseStatus"`
 	ResponseHeaders      map[string]string `json:"ResponseHeaders"`
+}
+
+type ClientOutPut struct {
+	OutputLog
+	Interval int64 `json:"interval"`
 }
 
 type OutputLog struct {

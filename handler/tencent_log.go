@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	errors1 "errors"
 	"fmt"
+	tchttp "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/http"
 	"io"
 	"log"
 	"net/http"
@@ -13,7 +16,7 @@ import (
 
 	cdn "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/cdn/v20180606"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
-	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/errors"
+	errors "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/errors"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
 )
 
@@ -40,6 +43,17 @@ type CDNDataResult struct {
 	Metric     string
 	Timestamps []string
 	Values     []int64
+}
+
+type DescribeOriginDataResponse struct {
+	*tchttp.BaseResponse
+	Response *DescribeOriginDataResponseParams `json:"Response"`
+}
+
+type DescribeOriginDataResponseParams struct {
+	Interval  *string                   `json:"Interval,omitnil,omitempty" name:"Interval"`
+	Data      []*cdn.ResourceOriginData `json:"OriginData,omitnil,omitempty" name:"OriginData"`
+	RequestId *string                   `json:"RequestId,omitnil,omitempty" name:"RequestId"`
 }
 
 func HandleTencentOnTimeLog(w http.ResponseWriter, r *http.Request) {
@@ -148,14 +162,18 @@ func GetMetric(req reqForTencentLog) interface{} {
 	}
 
 	var dataResults, dataOriginResults []CDNDataResult
+	//time.Sleep(time.Second * 5)
+	//fmt.Println("queriesStarted", queriesStarted)
+	//fmt.Println("results", len(results))
 	for i := 0; i < queriesStarted; i++ {
 		if res := <-results; res.Metric != "" {
 			dataResults = append(dataResults, res)
 		}
 	}
 	close(results)
-
 	originQueryCount := len(domains) * len(dimensions) * len(originMetrics)
+	//fmt.Println("originQueryCount", originQueryCount)
+	//fmt.Println("originResults", len(originResults))
 	for i := 0; i < originQueryCount; i++ {
 		if res := <-originResults; res.Metric != "" {
 			dataOriginResults = append(dataOriginResults, res)
@@ -167,8 +185,7 @@ func GetMetric(req reqForTencentLog) interface{} {
 	os.WriteFile("./test/log/dataResults.json", marshal, 0664)
 	marshal1, _ := json.Marshal(dataOriginResults)
 	os.WriteFile("./test/log/dataOriginResults.json", marshal1, 0664)
-	//printReport(dataResults)
-	//printReport(dataOriginResults)
+
 	formattedData := formatData(dataResults, dataOriginResults)
 
 	var (
@@ -193,31 +210,59 @@ func queryDimensionOriginData(param reqForTencentLog, client *cdn.Client, metric
 	} else {
 		req.Area = common.StringPtr("mainland")
 	}
-
-	resp, err := client.DescribeOriginData(req)
+	//fmt.Printf("queryDimensionOriginData req %+v \n", req.ToJsonString())
+	resp, err := DescribeOriginDataWithContext(context.Background(), client, req)
 	if err != nil {
 		if sdkErr, ok := err.(*errors.TencentCloudSDKError); ok {
-			fmt.Printf("queryDimensionOriginData API Error[%s]Msg[%s]Id[%s]\n", sdkErr.GetCode(), sdkErr.GetMessage(), sdkErr.GetRequestId())
+			fmt.Printf("queryDimensionOriginData(origin) API Error[%s]Msg[%s]Id[%s]\n", sdkErr.GetCode(), sdkErr.GetMessage(), sdkErr.GetRequestId())
+		}
+		ch <- CDNDataResult{}
+		return
+	}
+	//fmt.Printf("queryDimensionOriginData resp %+v \n", resp.ToJsonString())
+	// 解析数据
+	if len(resp.Response.Data) != 0 {
+		for _, item := range resp.Response.Data {
+			result := CDNDataResult{
+				Domain:   domain,
+				DataType: dataType,
+			}
+
+			for _, metricData := range item.OriginData {
+				result.Metric = *metricData.Metric
+				for _, detail := range metricData.DetailData {
+					result.Timestamps = append(result.Timestamps, *detail.Time)
+					result.Values = append(result.Values, int64(*detail.Value))
+				}
+			}
+			ch <- result
 		}
 		return
 	}
+	ch <- CDNDataResult{}
+}
 
-	// 解析数据
-	for _, item := range resp.Response.Data {
-		result := CDNDataResult{
-			Domain:   domain,
-			DataType: dataType,
-		}
-
-		for _, metricData := range item.OriginData {
-			result.Metric = *metricData.Metric
-			for _, detail := range metricData.DetailData {
-				result.Timestamps = append(result.Timestamps, *detail.Time)
-				result.Values = append(result.Values, int64(*detail.Value))
-			}
-		}
-		ch <- result
+func DescribeOriginDataWithContext(ctx context.Context, client *cdn.Client, request *cdn.DescribeOriginDataRequest) (response *DescribeOriginDataResponse, err error) {
+	if request == nil {
+		request = cdn.NewDescribeOriginDataRequest()
 	}
+
+	if client.GetCredential() == nil {
+		return nil, errors1.New("DescribeOriginData require credential")
+	}
+
+	request.SetContext(ctx)
+
+	response = NewDescribeOriginDataResponse()
+	err = client.Send(request, response)
+	return
+}
+
+func NewDescribeOriginDataResponse() (response *DescribeOriginDataResponse) {
+	response = &DescribeOriginDataResponse{
+		BaseResponse: &tchttp.BaseResponse{},
+	}
+	return
 }
 
 func queryDimensionData(param reqForTencentLog, client *cdn.Client, metric, domain, dataType string, r int, ch chan<- CDNDataResult) {
@@ -247,22 +292,26 @@ func queryDimensionData(param reqForTencentLog, client *cdn.Client, metric, doma
 			return
 		}
 
-		for _, item := range resp.Response.Data {
-			result := CDNDataResult{
-				Domain:   domain,
-				DataType: dataType,
-				Location: 0,
-			}
-
-			for _, metricData := range item.CdnData {
-				result.Metric = *metricData.Metric
-				for _, detail := range metricData.DetailData {
-					result.Timestamps = append(result.Timestamps, *detail.Time)
-					result.Values = append(result.Values, int64(*detail.Value))
+		if len(resp.Response.Data) != 0 {
+			for _, item := range resp.Response.Data {
+				result := CDNDataResult{
+					Domain:   domain,
+					DataType: dataType,
+					Location: 0,
 				}
+
+				for _, metricData := range item.CdnData {
+					result.Metric = *metricData.Metric
+					for _, detail := range metricData.DetailData {
+						result.Timestamps = append(result.Timestamps, *detail.Time)
+						result.Values = append(result.Values, int64(*detail.Value))
+					}
+				}
+				ch <- result
 			}
-			ch <- result
+			return
 		}
+		ch <- CDNDataResult{}
 		return
 	}
 
@@ -275,7 +324,7 @@ func queryDimensionData(param reqForTencentLog, client *cdn.Client, metric, doma
 		req.Domains = []*string{&domain}
 		req.Interval = common.StringPtr("min")
 		// 查询中国境外CDN数据时，可指定地区类型查询
-		//req.Area = common.StringPtr("overseas")
+		req.Area = common.StringPtr("overseas")
 		//req.AreaType = common.StringPtr("server")
 		req.District = common.Int64Ptr(int64(r))
 
@@ -288,22 +337,26 @@ func queryDimensionData(param reqForTencentLog, client *cdn.Client, metric, doma
 			return
 		}
 
-		for _, item := range resp.Response.Data {
-			result := CDNDataResult{
-				Domain:   domain,
-				DataType: dataType,
-				Location: r,
-			}
-
-			for _, metricData := range item.CdnData {
-				result.Metric = *metricData.Metric
-				for _, detail := range metricData.DetailData {
-					result.Timestamps = append(result.Timestamps, *detail.Time)
-					result.Values = append(result.Values, int64(*detail.Value))
+		if len(resp.Response.Data) != 0 {
+			for _, item := range resp.Response.Data {
+				result := CDNDataResult{
+					Domain:   domain,
+					DataType: dataType,
+					Location: r,
 				}
+
+				for _, metricData := range item.CdnData {
+					result.Metric = *metricData.Metric
+					for _, detail := range metricData.DetailData {
+						result.Timestamps = append(result.Timestamps, *detail.Time)
+						result.Values = append(result.Values, int64(*detail.Value))
+					}
+				}
+				ch <- result
 			}
-			ch <- result
+			return
 		}
+		ch <- CDNDataResult{}
 	}
 }
 
@@ -324,7 +377,7 @@ func GetLog(req reqForTencentLog) interface{} {
 		tmp = make(map[string][]interface{})
 	)
 	failRet := func() interface{} {
-		res["code"] = 500
+		res["code"] = 50001
 		res["status"] = "fail"
 		res["data"] = "查询日志失败"
 		return res
@@ -366,12 +419,12 @@ func queryDomainLogs(client *cdn.Client, domain, startTime, endTime, dim string)
 	req.EndTime = &endTime
 	req.Limit = common.Int64Ptr(1000)
 	req.Area = &dim // mainland-境内 overseas-境外
-
+	//fmt.Printf("req %+v", req.ToJsonString())
 	resp, err := client.DescribeCdnDomainLogs(req)
-	//fmt.Println("resp", *resp.Response.RequestId)
+	//fmt.Println("resp", resp.ToJsonString())
 	if err != nil {
 		if sdkErr, ok := err.(*errors.TencentCloudSDKError); ok {
-			return nil, fmt.Errorf("API Error[%s] %s", sdkErr.GetCode(), sdkErr.GetMessage())
+			return nil, fmt.Errorf("API Error[%s]Mag[%s]Id[%s]", sdkErr.GetCode(), sdkErr.GetMessage(), sdkErr.RequestId)
 		}
 		return nil, err
 	}
@@ -503,9 +556,9 @@ func formatData(reqData []CDNDataResult, originData []CDNDataResult) map[string]
 
 func getRegionByDataType(dataType string) string {
 	if dataType == "mainland" {
-		return "asia"
+		return "mainland_china"
 	}
-	return "asia"
+	return "mainland_china"
 }
 
 func getValueOrDefault(metrics map[string]int64, key string, defaultValue int64) int64 {
