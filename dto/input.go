@@ -68,4 +68,6 @@ type OutputLog struct {
 	BSHTTPCode3XX int    `json:"bs_http_code_3xx"`
 	BSHTTPCode4XX int    `json:"bs_http_code_4xx"`
 	BSHTTPCode5XX int    `json:"bs_http_code_5xx"`
+
+	TenantId string `json:"tenantId"`
 }

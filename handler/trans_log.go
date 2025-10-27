@@ -41,6 +41,7 @@ func TransformLog(input dto.InputLog) dto.OutputLog {
 	output.Domain = input.ClientRequestHost
 	output.BW = input.ClientRequestBytes * 8
 	output.Flux = input.ClientRequestBytes
+	output.TenantId = ""
 
 	// MISS  / EXPIRED / BYPASS  / DYNAMIC
 	if input.OriginResponseStatus != 0 && input.OriginResponseStatus != 304 &&
