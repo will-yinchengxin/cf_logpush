@@ -69,5 +69,48 @@ type OutputLog struct {
 	BSHTTPCode4XX int    `json:"bs_http_code_4xx"`
 	BSHTTPCode5XX int    `json:"bs_http_code_5xx"`
 
-	TenantId string `json:"tenantId"`
+	TenantId  string `json:"tenantId"`
+	TimeLocal int64  `json:"time_local"`
+}
+
+type ClientOutPutStatisticalData struct {
+	OutputLog
+	Interval int64 `json:"interval"`
+}
+
+type OutputStatisticalData struct {
+	StartTime     int64  `json:"start_time"`
+	Country       string `json:"c"`
+	Region        string `json:"r"`
+	Domain        string `json:"d"`
+	BW            int    `json:"bw"`
+	Flux          int    `json:"flux"`
+	BSBW          int    `json:"bs_bw"`
+	BSFlux        int    `json:"bs_flux"`
+	ReqNum        int    `json:"req_num"`
+	HitNum        int    `json:"hit_num"`
+	BSNum         int    `json:"bs_num"`
+	BSFailNum     int    `json:"bs_fail_num"`
+	HitFlux       int    `json:"hit_flux"`
+	HTTPCode2XX   int    `json:"2xx"`
+	HTTPCode3XX   int    `json:"3xx"`
+	HTTPCode4XX   int    `json:"4xx"`
+	HTTPCode5XX   int    `json:"5xx"`
+	BSHTTPCode2XX int    `json:"b2xx"`
+	BSHTTPCode3XX int    `json:"b3xx"`
+	BSHTTPCode4XX int    `json:"b4xx"`
+	BSHTTPCode5XX int    `json:"b5xx"`
+
+	TenantId  string `json:"t"`
+	TimeLocal int64  `json:"time_local"`
+}
+
+type OutputLogBillDate struct {
+	TenantId  string `json:"t"`
+	StartTime int64  `json:"start_time"`
+	TimeLocal int64  `json:"time_local"`
+	Domain    string `json:"d"`
+	BW        int    `json:"bw"`
+	Flux      int    `json:"flux"`
+	Interval  int64  `json:"interval"`
 }

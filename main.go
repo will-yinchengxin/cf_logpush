@@ -29,6 +29,9 @@ func main() {
 	http.HandleFunc("/tencent/zipLog", handler.HandleTencentZipLog)
 	http.HandleFunc("/cloudFlare/onTimeLog", handler.HandleCloudFlareOnTimeLog)
 	http.HandleFunc("/client/log_push", handler.HandleClientLogPush)
+
+	http.HandleFunc("/v2/client/log_push/statisticalData", handler.HandleStatisticalData)
+	http.HandleFunc("/v2/client/log_push/billingData", handler.HandleBillingData)
 	port := "9880"
 	log.Printf("启动日志接收服务器，监听端口 %s...\n", port)
 
