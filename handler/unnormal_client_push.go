@@ -35,6 +35,12 @@ func init() {
 
 		username := os.Getenv("ES_USERNAME")
 		password := os.Getenv("ES_PASSWORD")
+		if username == "" {
+			username = "elastic"
+		}
+		if password == "" {
+			password = "2wsxzaq1~"
+		}
 
 		var client *elastic.Client
 		var err error
